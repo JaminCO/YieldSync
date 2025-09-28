@@ -1,0 +1,92 @@
+
+services:
+  # Frontend Service
+  frontend:
+    build: ./frontend/YieldSync
+    container_name: yieldsync_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - api
+    networks:
+      - yieldsync-network
+
+  # Backend API Service
+  api:
+    build: ./backend
+    container_name: yieldsync_api
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=yieldsync
+      - POSTGRES_SERVER=db
+      - POSTGRES_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - ENV=production
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./backend:/app
+    networks:
+      - yieldsync-network
+
+  # Celery Worker Service
+  worker:
+    build: ./backend
+    container_name: yieldsync_worker
+    command: celery -A app.worker.celery_app worker --loglevel=info
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=yieldsync
+      - POSTGRES_SERVER=db
+      - POSTGRES_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - ENV=production
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./backend:/app
+    networks:
+      - yieldsync-network
+
+  # PostgreSQL Database
+  db:
+    image: postgres:15
+    container_name: yieldsync_db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: yieldsync
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - yieldsync-network
+
+  # Redis Cache & Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: yieldsync_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - yieldsync-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  yieldsync-network:
+    driver: bridge
