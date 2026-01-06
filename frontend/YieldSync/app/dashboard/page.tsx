@@ -1,4 +1,5 @@
 import { summaryInfo } from "@/data/summaryInfo";
+import Link from "next/link";
 import React from "react";
 import Image from "next/image";
 import { recommendInfo } from "@/data/recommendationInfo";
@@ -29,7 +30,7 @@ const Dashboard = () => {
         <h2 className="text-2xl">Top Recommendations</h2>
         <div className="mt-7 flex-wrap flex-row flex min-[450px]:flex-col justify-center items-center min-[450px]:items-start md:ml-9 gap-6">
           {recommendInfo.map((rec) => (
-           <RecommendationCard key={rec.id} name={rec.name} risk={rec.risk}/>
+           <RecommendationCard key={rec.id} name={rec.name} id={rec.id} risk={rec.risk}/>
           ))}
         </div>
       </div>
@@ -37,8 +38,15 @@ const Dashboard = () => {
       <div className="quick-actions">
         <h2 className="text-2xl">Quick Actions</h2>
         <div className="quick-btns mt-4">
-          <button className="w-[46%] py-3 lg:w-[400px] rounded-3xl  mr-7 md:mr-7 cursor-pointer p-2 bg-[#070550]">Manage Wallets</button>
-          <button className="w-[46%] py-3 lg:w-[400px] cursor-pointer p-2 rounded-3xl bg-[#00a2ff]">Explore Pools</button>
+          <Link href={'/dashboard/wallet'}>
+            <button className="w-[46%] py-3 lg:w-[400px] rounded-3xl  mr-7 md:mr-7 cursor-pointer p-2 bg-[#070550]">Manage Wallets</button>
+          </Link>
+
+          <Link href={'/dashboard/pools'}>
+            <button className="w-[46%] py-3 lg:w-[400px] cursor-pointer p-2 rounded-3xl bg-[#00a2ff]">Explore Pools</button>
+          </Link>
+          
+          
         </div>
       </div>
     </div>

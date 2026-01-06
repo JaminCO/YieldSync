@@ -25,11 +25,11 @@ export const navItem: NavItem[] = [
      name: 'Recommendations',
      href: '/dashboard/recommendations'
   },
-  {
-     id: 4,
-     image : '/settings-icon.svg',
-     name: 'Settings',
-     href: '/dashboard/settings'
-  },
+  // {
+  //    id: 4,
+  //    image : '/settings-icon.svg',
+  //    name: 'Settings',
+  //    href: '/dashboard/settings'
+  // },
  
 ]

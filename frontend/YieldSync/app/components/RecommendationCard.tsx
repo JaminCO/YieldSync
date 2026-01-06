@@ -1,13 +1,17 @@
+
 import React from 'react'
+import Link from 'next/link'
 import Image from 'next/image'
 
 interface RecommendationCardProps{
+  id:number,
   name: string,
   risk:string
 }
-const RecommendationCard = ({name, risk}: RecommendationCardProps) => {
+const RecommendationCard = ({id,name, risk}: RecommendationCardProps) => {
   
   return (
+   
      <div  className="bg-[#070550] rounded-2xl flex-col w-[300px]  flex min-[450px]:py-2 min-[450px]:flex-row min-[450px]:max-h-[130px] items-center justify-between min-[450px]:w-[100%] min-[450px]:px-3   ">
                   <div className="flex flex-col min-[450px]:flex-row ">
                     <Image
@@ -24,9 +28,12 @@ const RecommendationCard = ({name, risk}: RecommendationCardProps) => {
                     </div>
                   </div>
                   <div className="p-4 sm:p-0 sm:ml-auto mr-3.5 flex sm:items-center j sm:justify-end">
-                    <button className="bg-[#00a2ff] px-6 py-2 rounded-3xl text-white font-medium  hover:bg-[#0090e6] cursor-pointer transition">
+                     <Link href={`/dashboard/recommendations/${id}`}>
+                       <button className="bg-[#00a2ff] px-6 py-2 rounded-3xl text-white font-medium  hover:bg-[#0090e6] cursor-pointer transition">
                       Explore
                     </button>
+                     </Link>
+                    
                   </div>
                 </div>
   )

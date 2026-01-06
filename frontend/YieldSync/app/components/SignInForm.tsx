@@ -4,14 +4,15 @@ import NavBar from "../components/NavBar";
 
 interface SignInFormProps {
   onSubmit?: (data: { email: string; password: string; rememberMe: boolean }) => void;
-  onForgotPassword?: () => void;
+ signPage: boolean,
   onCreateAccount?: () => void;
+
 }
 
 const SignInForm: React.FC<SignInFormProps> = ({
   onSubmit = () => {},
-  onForgotPassword = () => {},
   onCreateAccount = () => {},
+  signPage
 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
@@ -31,9 +32,9 @@ const SignInForm: React.FC<SignInFormProps> = ({
         <div className="w-full max-w-md bg-zinc-900/80 backdrop-blur-md -mt-6 sm:-mt-10 rounded-xl shadow-xl p-6 sm:p-8">
           {/* Header */}
           <div className="text-center mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold mb-1">Welcome Back</h2>
+            <h2 className="text-xl sm:text-2xl font-bold mb-1">Welcome {signPage? 'Back': ''}</h2>
             <p className="text-xs sm:text-sm text-gray-300 ">
-              Enter your credentials to access your account
+              Enter your credentials to {signPage? 'access': 'create'} your account
             </p>
           </div>
 
@@ -61,13 +62,7 @@ const SignInForm: React.FC<SignInFormProps> = ({
                 <label htmlFor="password" className="text-sm font-medium">
                   Password
                 </label>
-                <button
-                  type="button"
-                  onClick={onForgotPassword}
-                  className="text-xs sm:text-sm text-blue-500 hover:underline"
-                >
-                  Forgot password?
-                </button>
+               
               </div>
               <div className="relative">
                 <input
@@ -111,18 +106,18 @@ const SignInForm: React.FC<SignInFormProps> = ({
               type="submit"
               className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 rounded-md transition-colors text-sm sm:text-base"
             >
-              Sign In
+                {signPage? 'Log In': 'Sign up'}
             </button>
           </form>
 
           {/* Footer */}
           <div className="text-center mt-6 text-xs sm:text-sm text-gray-300 ">
-            Don&apos;t have an account?{" "}
+            {signPage? 'Don&apos;t': ''} have an account?{" "}
             <button
               onClick={onCreateAccount}
               className="text-blue-500 hover:underline font-medium"
             >
-              Create account
+              {signPage? 'Create Account': 'Log In'}
             </button>
           </div>
         </div>

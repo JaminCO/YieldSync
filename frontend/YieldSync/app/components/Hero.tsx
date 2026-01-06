@@ -1,5 +1,5 @@
 import React from "react";
-
+import Link from "next/link";
 
 const Hero = () => {
 	return (
@@ -12,9 +12,13 @@ const Hero = () => {
           <p className="text-base sm:text-xl mt-8 text-center">
             YieldSync analyzes your wallet and recommends the best <br /> pools to maximize returns — explained in plain English.
           </p>
-					<button className="bg-[#00D4FF] text-[#000000] mt-8 px-7 py-3 rounded-3xl lg:px-12 lg:text-lg cursor-pointer sm:inline-block">
+					
+					<Link href={'/sign-up'}>
+					  <button className="bg-[#00D4FF] text-[#000000] mt-8 px-7 py-3 rounded-3xl lg:px-12 lg:text-lg cursor-pointer sm:inline-block">
 						Get Early Access
 					</button>
+					</Link>
+					
 				</div>
 				
 			</div>

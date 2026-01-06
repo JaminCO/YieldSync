@@ -1,6 +1,7 @@
 'use client'
 import React, { useState } from 'react';
 import { Wallet, Shield, Zap, ArrowRight, Check,  } from 'lucide-react';
+import { useRouter } from 'next/router';
 
 
 const ConnectWallet = () => {
@@ -14,6 +15,8 @@ const ConnectWallet = () => {
     popular: boolean;
     color: string;
   } | null>(null);
+
+  // const router = useRouter()
 
   const wallets = [
     {
@@ -65,7 +68,7 @@ const ConnectWallet = () => {
       color: 'from-pink-500 to-yellow-500'
     }
   ];
-
+  
   const handleConnect = async (walletId: string) => {
     setConnecting(walletId);
     
@@ -76,12 +79,19 @@ const ConnectWallet = () => {
       const foundWallet = wallets.find(w => w.id === walletId);
       setConnectedWallet(foundWallet || null);
     }, 2000);
+    
   };
 
   const handleDisconnect = () => {
     setConnected(false);
     setConnectedWallet(null);
   };
+
+  // if (connectedWallet) {
+  //   setTimeout(() => {
+  //     router.push('/dashboard')
+  //   }, 5000);
+  // }
 
   if (connected) {
     return (

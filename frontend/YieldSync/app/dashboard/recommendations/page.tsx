@@ -14,7 +14,7 @@ const Recommendations = () => {
          
         <div className="mt-7 flex-wrap flex-row flex min-[450px]:flex-col min-[650px]:w-[600px] min-[800px]:w-[700px] justify-center items-center min-[450px]:items-start lg:w-[900px] md:ml-9 gap-6">
           {recommendInfo.map((rec) => (
-           <RecommendationCard key={rec.id} name={rec.name} risk={rec.risk}/>
+           <RecommendationCard key={rec.id} name={rec.name} id={rec.id} risk={rec.risk}/>
           ))}
         
         </div>
