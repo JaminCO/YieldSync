@@ -3,7 +3,7 @@ import datetime
 from typing import Dict, Any, List, Optional
 import requests
 import math
-from app.pull_data import fetch_pools, fetch_protocol_details, apy_search
+from app.services.pull_data import fetch_pools, fetch_protocol_details, apy_search
 
 def score_defillama_pool(pool: dict) -> dict:
     """
@@ -69,7 +69,7 @@ def score_defillama_pool(pool: dict) -> dict:
     return {
         "apy": round(apy, 4),
         "tvl_score": tvl_score,
-        "risk_score": f"{risk_score_percent}%",
+        "risk_score": risk_score_percent,
         "final_score": final_score,
         "breakdown": {
             "tvl": f"Liquidity: ${tvl_usd:,.0f} → score {tvl_score}",

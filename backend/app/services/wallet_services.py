@@ -31,7 +31,7 @@ def delete_wallet(db: Session, wallet: Wallet):
     return {"message": "Wallet deleted successfully"}
 
 def get_wallet_balance_eth(address):
-    url = f"https://api.etherscan.io/v2/api"
+    url = os.getenv("ETHERSCAN_BASE_URL")
     params = {
         "chainid": 1,
         "module": "account",
@@ -132,3 +132,11 @@ def get_token_balances_and_metadata(address):
             "contract_address": contract_address
         })
     return token_list
+
+def get_balances(address):
+    eth_balance = get_wallet_balance_eth(address)
+    token_balances = get_token_balances_and_metadata(address)
+    return {
+        "eth_balance": eth_balance,
+        "token_balances": token_balances
+    }

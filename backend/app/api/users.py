@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from app.models.schemas import UserCreate, LoginRequest, UserSchema
 from app.services.user_services import create_user, get_current_user_dep, login_user
+from app import start_test
 from app.models.models import User
 from app.db import SessionLocal
 from sqlalchemy.orm import Session
@@ -33,3 +34,7 @@ async def login(user: LoginRequest, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserSchema)
 async def get_me(current_user: User = Depends(get_current_user_dep)):
     return current_user
+
+@router.get("/test/{id}")
+async def run_test(id: int):
+    return start_test(id)

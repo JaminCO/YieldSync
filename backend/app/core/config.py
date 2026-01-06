@@ -8,7 +8,8 @@ load_dotenv()
 class Settings(BaseSettings):
     PROJECT_NAME: str = "YieldSync AI"
     API_V1_STR: str = "/api/v1"
-    
+    DATABASE_URL: str = "postgresql://admin:password@localhost:5432/yieldsync"
+
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
     POSTGRES_DB: str

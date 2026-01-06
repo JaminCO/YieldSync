@@ -72,7 +72,7 @@ def login_user(email: str, password: str, db: Session):
     if user and verify_password(password, user.password_hash):
         token = create_jwt_token({"sub": user.email, "user_id": user.id})
         return {"user": user, "access_token": token}
-    return None
+    return {"error": "Invalid credentials"}
 
 def get_user_by_id(user_id: int, db: Session):
     return db.query(User).filter(User.id == user_id).first()

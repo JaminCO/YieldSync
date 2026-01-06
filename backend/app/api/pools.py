@@ -58,6 +58,16 @@ async def get_pools_endpoint(
     pools = query.all()
     return {"pools": pools}
 
+@router.get("/pools/{pool_id}", description="Fetch a specific pool by ID")
+async def get_pool_endpoint(pool_id: int, db: Session = Depends(get_db)):
+    pool = db.query(Pool).filter(Pool.id == pool_id).first()
+    if not pool:
+        raise HTTPException(status_code=404, detail="Pool not found")
+    return {"pool": pool}
+
+    pools = db.query(Pool).filter(Pool.id == pool_id).first()
+    return {"pool": pool}
+
 
 
 @router.get("/protocols", description="Fetch protocols from external API")

@@ -5,12 +5,14 @@ from typing import Dict, Any, List, Optional
 POOLS_URL = "https://yields.llama.fi/pools"
 PROTOCOL_URL_TMPL = "https://api.llama.fi/protocol/{slug}"
 
-def fetch_pools(limit: Optional[int] = None) -> List[Dict[str, Any]]:
+def fetch_pools(limit: Optional[int] = 10) -> List[Dict[str, Any]]:
     resp = requests.get(POOLS_URL, timeout=30)
     resp.raise_for_status()
     data = resp.json()
     pools = data.get("data", [])
-    return pools[:limit] if limit else pools
+    print(f"Total pools fetched: {len(pools)}")
+    eth_pools = [p for p in pools if str(p.get("chain", "")).lower() == "ethereum"]
+    return eth_pools[:limit] if limit else eth_pools
 
 def fetch_protocol_details(slug: str) -> Dict[str, Any]:
     resp = requests.get(PROTOCOL_URL_TMPL.format(slug=slug), timeout=30)

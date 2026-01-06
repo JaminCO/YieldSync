@@ -1,30 +1,35 @@
 from logging.config import fileConfig
+import os
+import sys
+
+# make project package importable
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(project_root)
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
-from app.db.models import Base  # Import your models here to ensure they are registered
+
+# import app settings & models so metadata is populated
+from app.core.config import settings
+from app.db import Base  # your declarative Base
+import app.models.models  # ensure model classes are imported/registered
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
+# override sqlalchemy.url with your runtime settings (optional)
+if hasattr(settings, "DATABASE_URL") and settings.DATABASE_URL:
+    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+
 # Interpret the config file for Python logging.
-# This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-target_metadata = None
-
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+# point Alembic to your metadata for autogenerate
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
@@ -45,6 +50,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_type=True,
     )
 
     with context.begin_transaction():
@@ -66,7 +72,9 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
         )
 
         with context.begin_transaction():

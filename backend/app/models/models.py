@@ -33,6 +33,7 @@ class Wallet(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     transactions = relationship("Transaction", back_populates="wallet")
+    token_transfers = relationship("TokenTransfer", back_populates="wallet")
     activity_score = relationship("WalletActivityScore", back_populates="wallet")
     user = relationship("User", back_populates="wallets")
 
@@ -78,7 +79,6 @@ class Transaction(Base):
     status = Column(String, nullable=False)
 
     wallet = relationship("Wallet", back_populates="transactions")
-    token_transfers = relationship("TokenTransfer", back_populates="transaction")
 
 
 class TokenTransfer(Base):
@@ -101,8 +101,12 @@ class TokenTransfer(Base):
     """
     
     __tablename__ = "token_transfers"
-
-    tx_hash = Column(String, ForeignKey("transactions.tx_hash"), primary_key=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    wallet_id = Column(Integer, ForeignKey('wallets.id'))  # Ensure this line exists
+    tx_hash = Column(String)
+    chain = Column(String)
+    token_decimal = Column(Integer)
+    token_name = Column(String)
     token_address = Column(String, nullable=False)
     token_symbol = Column(String, nullable=False)
     from_address = Column(String, nullable=False)
@@ -111,7 +115,7 @@ class TokenTransfer(Base):
     token_type = Column(Enum("ERC20", "ERC721", name="token_type"), nullable=False)
     timestamp = Column(DateTime, nullable=False)
 
-    transaction = relationship("Transaction", back_populates="token_transfers")
+    wallet = relationship("Wallet", back_populates="token_transfers")
 
 class WalletActivityScore(Base):
     """
@@ -212,12 +216,13 @@ class Pool(Base):
     exposure = Column(String(100), nullable=True)
     
     risk_score = Column(Numeric, nullable=True)
+    tvl_score = Column(Numeric, nullable=True)
     summary = Column(Text, nullable=True)
     action = Column(Text, nullable=True)
     final_score = Column(Numeric, nullable=True)
     breakdown = Column(JSONB, nullable=True)  # Store explanation, breakdown, etc.
 
-    metadata = Column(JSONB, nullable=True)
+    other_data = Column(JSONB, nullable=True)
     supported_chains = Column(JSONB, nullable=True)
     underlying_assets = Column(JSONB, nullable=True)
 
@@ -257,11 +262,9 @@ class Recommendation(Base):
     tvl_score = Column(Numeric, nullable=True)
     risk_score = Column(Numeric, nullable=True)
     projected_roi = Column(Numeric, nullable=True)
-    final_score = Column(Numeric, nullable=True)
 
     # AI explanation
     details = Column(Text, nullable=True)
-    risks = Column(Text, nullable=True)
     next_steps = Column(Text, nullable=True)
     breakdown = Column(JSONB, nullable=True)  # Store explanation, breakdown, etc.
 

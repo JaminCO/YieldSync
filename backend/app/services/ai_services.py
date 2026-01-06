@@ -3,7 +3,7 @@ import os
 import json
 import google.generativeai as genai
 from dotenv import load_dotenv
-from app.services.utils import GeminiClient, ExplanationEngine
+from app.services.utils import GeminiClient, ExplanationEngine, PersonalizationEngine 
 
 load_dotenv()
 
@@ -12,7 +12,7 @@ def create_sample_recommendation(user_profile, pool_data, score_result) -> str:
 
     # Initialize the engines
     gemini_client = GeminiClient()
-    explanation_engine = ExplanationEngine()
+    explanation_engine = PersonalizationEngine()
 
     # Execute the pipeline
     explanation = explanation_engine.generate_explanation(user_profile, pool_data, score_result)

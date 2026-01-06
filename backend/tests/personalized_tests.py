@@ -47,57 +47,52 @@ class GeminiClient:
 # Singleton instance
 gemini_client = GeminiClient()
 
-class ExplanationEngine:
+class PersonalizationEngine:
     """Generates human-readable explanations for pool recommendations"""
     
     def __init__(self):
         self.gemini_client = GeminiClient()
         self.explanation_prompt = """
-        You are an expert financial advisor for decentralized finance (DeFi).
-        You have access to the internet and many resources and live data on DeFi and Crypto.
-        Your goal is to explain a pool recommendation in plain English, avoiding jargon where possible,
-        the main goal is to make sure the user either a beginner or an expert understands the recommendation and about this pool.
+        You are a personalized DeFi financial advisor. Your role is to explain pool recommendations in clear, simple language that matches each user's experience level.
 
-        TASK: You will be given:
-        1. A pool's basic data (name, APY, etc.).
-        2. Scores and other information that was calculated based off of the pool's metrics.
+        TASK: Create personalized investment explanations using:
+        1. User's profile, goals, and risk tolerance
+        2. Pool data and metrics (APY, TVL, audit status, etc.)
+        3. Calculated scores and risk assessments
 
-        USE THE INFORMATION GIVEN TO YOU AS MORE DATA TO ANSWER THE QUESTIONS, 
-        Use especially all the information about the pools, the scores, risk scores, and more.
-        Also you can search the internet for more information, but they must be true and correspond with the pool you are working on
+        CRITICAL RULES:
+        - Write in complete sentences only - NO bullets, numbers, markdown, or asterisks
+        - Use plain English that beginners can understand
+        - Include specific numbers in brackets like this: (4.5%), ($1.2 billion), (85/100)
+        - Keep explanations factual and data-driven
+        - Always connect pool features to user's specific situation
 
+        REQUIRED CONTENT STRUCTURE:
+        1. Start with how this pool matches the user's goals and experience level
+        2. Explain key metrics and what they mean for the user personally
+        3. Describe the most important risks in simple terms
+        4. End with clear recommendation: whether to consider this pool and why
 
-        Your task is to generate a clear, concise explanation (atleast 4 sentences) that includes:
-        An explanation in Simple English for beginners, about this pool, 
-        Include a brief summary of the pool's key metrics (APY, TVL, risks, etc.) and what they mean for the user.
-        "Make sure to use pool data and metrics and scoring",
-        add the risks, most important risks in simple terms.",
-        And a final recommendation statement whether the user should consider this pool or not, and why.
-        Keep the explanation factual and based on the data provided.
-
-        RULES:
-        - YOUR RESPONSE MUST BE.
-        - ALL PLAIN ENGLISH, NO ASTERISKS, NO MARKDOWN, NO BULLETS, NO NUMBERS, NO JARGON.
-        - WHEN CALLING OUT NUMBERS ADD THE FIGURES IN BRACKETS, I.E. (5%), (100,000 USD), (20)
+        Remember to use all provided data - pool metrics, risk scores, and user preferences - to create truly personalized advice.
         """
         
         self.action_prompt = """
-        You are an expert financial advisor for decentralized finance (DeFi).
-        You have access to the internet and many resources and live data on DeFi and Crypto.
-        Your goal is to provide a one-word action recommendation based on the pool's data and your analysis.
+        You are a DeFi investment advisor. Analyze pool data AND user profile to provide a one-word action recommendation.
 
-        TASK: Based on the pool's data and your analysis, provide a one-word action recommendation:
-        - If you think the user should invest in the pool, respond with "Invest".
-        - If you think the user should avoid the pool, respond with "Avoid".
+        TASK: Based on comprehensive analysis of both the pool data AND user profile, output only one word:
+        - "Invest" if the pool matches the user's goals, risk tolerance, and appears safe
+        - "Avoid" if the pool doesn't match user preferences or appears too risky for them
 
-        Your response must be based on the data provided and your understanding of the DeFi landscape.
+        Consider both factors: pool safety metrics AND user's specific situation, goals, and risk tolerance.
 
-        RULES:
-        - YOUR RESPONSE MUST BE.
-        - ALL PLAIN ENGLISH, NO ASTERISKS, NO MARKDOWN, NO BULLETS, NO NUMBERS, NO JARGON.
+        CRITICAL RULES:
+        - Output exactly one word: "Invest" or "Avoid"
+        - No explanations, no additional text, no formatting
+        - Base decision on the combination of pool metrics and user profile suitability
         """
     
     def generate_explanation(self, 
+                           user_profile: Dict[str, Any],
                            pool_data: Dict[str, Any], 
                            score_result: Dict[str, Any]) -> Dict[str, Any]:
         """Generate human-readable explanation for a pool recommendation"""
@@ -105,10 +100,13 @@ class ExplanationEngine:
         user_prompt = f"""
 
         You are given the following information:
-        1. Pool Data:
+        1. User Profile:
+        - Profile: {user_profile}
+
+        2. Pool Data:
         - Pool: {pool_data}
 
-        2. Pool Metrics SCORE:
+        3. Pool Metrics SCORE:
         - Scores: {score_result}
 
         """
@@ -121,17 +119,21 @@ class ExplanationEngine:
         # Add metadata
         return response
 
-    def generate_action(self, 
+    def generate_action(self,
+                           user_profile: Dict[str, Any],
                            pool_data: Dict[str, Any], 
                            score_result: Dict[str, Any]) -> Dict[str, Any]:
         """Generate human-readable explanation for a pool recommendation"""
         
         user_prompt = f"""
         You are given the following information:
-        1. Pool Data:
+        1. User Profile:
+        - Profile: {user_profile}
+
+        2. Pool Data:
         - Pool: {pool_data}
 
-        2. Pool Metrics SCORE:
+        3. Pool Metrics SCORE:
         - Scores: {score_result}
 
         One word action based on the above information, either "Invest" or "Avoid".
@@ -148,7 +150,7 @@ class ExplanationEngine:
 
 
 # Global instance
-explanation_engine = ExplanationEngine()
+explanation_engine = PersonalizationEngine()
 
 def create_sample_recommendation():
     """Example of how to use all three engines together"""
@@ -246,11 +248,21 @@ def create_sample_recommendation():
             "apyBaseInception": null
         }
         }""")
+
+    user_profile = {
+        "name": "Alice",
+        "experience_level": "beginner",
+        "investment_goals": "steady income with low risk",
+        "risk_tolerance": "low",
+        "preferred_chains": ["Ethereum", "Polygon"],
+        "preferred_projects": ["maple", "aave"],
+        "disliked_projects": ["uniswap"]
+    }
     
     # Execute the pipeline
-    explanation = explanation_engine.generate_explanation(pool_data, score_result)
+    explanation = explanation_engine.generate_explanation(user_profile, pool_data, score_result)
 
-    action = explanation_engine.generate_action(pool_data, score_result)
+    action = explanation_engine.generate_action(user_profile, pool_data, score_result)
 
 
     return [str(explanation), action]

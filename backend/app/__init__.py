@@ -1,6 +1,6 @@
 from celery import Celery
 from app.core.config import settings
-from app.pull_data import fetch_pools, fetch_protocol_details
+from app.services.pull_data import fetch_pools, fetch_protocol_details
 from app.models.models import Recommendation, Protocol, Pool, User, Wallet, Transaction, TokenTransfer, WalletActivityScore
 from app.db import get_db
 from app.services.rec_engine import score_defillama_pool
@@ -10,8 +10,10 @@ from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 import json
 import requests
+import time
 import os
 from datetime import datetime
+
 
 
 load_dotenv()
@@ -19,21 +21,16 @@ load_dotenv()
 ETHERSCAN_API_KEY = os.getenv("ETHERSCAN_API_KEY")
 BASE_URL = os.getenv("ETHERSCAN_BASE_URL")
 
-transaction_list = []
-token_transfer_list = []
-internal_transaction_list = []
 limit = 50
 
 
-celery_app = Celery(
-    "yieldsync_worker",
-    broker=settings.REDIS_URL, 
-    backend=settings.REDIS_URL
-)
-
-@celery_app.task
-def pull_wallet_transactions(address: str, wallet_id: int, chain: str = "ETH"):
+def pull_wallet_transactions(address: str, chain: str = "ETH"):
     db: Session = next(get_db())
+    wallet_id = db.query(Wallet).filter(Wallet.address == address).first().id
+
+    transaction_list = []
+    internal_transaction_list = []
+    token_transfer_list = []
 
     def get(endpoint, params):
         params.update({"chainid":1, "module": "account", "address": address, "apikey": ETHERSCAN_API_KEY})
@@ -44,6 +41,9 @@ def pull_wallet_transactions(address: str, wallet_id: int, chain: str = "ETH"):
     # Fetch normal transactions
     normal_txs = get("txlist", {"action": "txlist", "startblock": 0, "endblock": 99999999, "sort": "desc"})
     for tx in normal_txs[:limit]:
+        existing_hashes = {t[0] for t in db.query(Transaction.tx_hash).filter(Transaction.wallet_id == wallet_id).all()}
+        if tx["hash"] in existing_hashes:
+            continue
         transaction_list.append(Transaction(
             wallet_id=wallet_id,
             chain=chain,
@@ -104,11 +104,21 @@ def pull_wallet_transactions(address: str, wallet_id: int, chain: str = "ETH"):
             token_type="ERC20",  # You can add logic to detect ERC721 if needed
             timestamp=str(datetime.fromtimestamp(int(tx["timeStamp"])))
         ))
-    db.bulk_save_objects(transaction_list)
-    db.bulk_save_objects(internal_transaction_list)
-    db.bulk_save_objects(token_transfer_list)
+        # Save transactions safely in order
+    try:
+        if transaction_list:
+            db.bulk_save_objects(transaction_list)
+        if internal_transaction_list:
+            db.bulk_save_objects(internal_transaction_list)
+        db.commit()  # Ensure tx_hash rows exist before token transfers
 
-    db.commit()
+        if token_transfer_list:
+            db.bulk_save_objects(token_transfer_list)
+            db.commit()
+    except Exception as e:
+        db.rollback()
+        raise e
+
 
     return {
         "transaction_list": transaction_list,
@@ -116,15 +126,16 @@ def pull_wallet_transactions(address: str, wallet_id: int, chain: str = "ETH"):
         "token_transfer_list": token_transfer_list
     }
 
-@celery_app.task
-def analyze_wallet_data(wallet_id: int):
+def analyze_wallet_data(address):
+
     db: Session = next(get_db())
-    wallet = db.query(Wallet).filter(Wallet.id == wallet_id).first()
+    wallet = db.query(Wallet).filter(Wallet.address == address).first()
+    wallet_id = wallet.id if wallet else None
+
     if not wallet:
         return None
-
-    from app.services.utils import WalletAnalyzer
-
+    if db.query(WalletActivityScore).filter(WalletActivityScore.wallet_address == wallet.address).first():
+        return None  # Skip if analysis already exists
     analyzer = WalletAnalyzer()
     wallet_data = {
         "transaction_list": [tx.__dict__ for tx in db.query(Transaction).filter(Transaction.wallet_id == wallet_id).all()],
@@ -151,60 +162,92 @@ def analyze_wallet_data(wallet_id: int):
         return score_entry
     return None
 
-@celery_app.task
 def pull_protocol_data(slug: str):
     db: Session = next(get_db())
     protocols = fetch_protocol_details(slug)
+    prots = None
     if not protocols:
         return None
         
     proto_json = protocols
-    protocol = Protocol(
-    name=proto_json.get("name"),
-    protocol_id=proto_json.get("id"),
-    address=proto_json.get("address"),
-    symbol=proto_json.get("symbol"),
-    url=proto_json.get("url"),
-    description=proto_json.get("description"),
-    chain=proto_json.get("chain"),
-    logo=proto_json.get("logo"),
-    audits=proto_json.get("audits"),
-    category=proto_json.get("category"),
-    twitter=proto_json.get("twitter"),
-    parent_protocol=proto_json.get("parentProtocol"),
-    chains=proto_json.get("chains"),
-    chain_tvls=proto_json.get("chainTvls"),
-    listed_at=proto_json.get("listedAt"),
-    slug=proto_json.get("slug"),
-    )
+    existing_protocol = db.query(Protocol).filter(Protocol.protocol_id == proto_json.get("id")).first()
 
-    db.add(protocol)
-    db.commit()
-    db.refresh(protocol)
+    if existing_protocol:
+        # Update existing protocol
+        existing_protocol.name = proto_json.get("name")
+        existing_protocol.address = proto_json.get("address")
+        existing_protocol.symbol = proto_json.get("symbol")
+        existing_protocol.url = proto_json.get("url")
+        existing_protocol.description = proto_json.get("description")
+        existing_protocol.chain = proto_json.get("chain")
+        existing_protocol.logo = proto_json.get("logo")
+        existing_protocol.audits = proto_json.get("audits")
+        existing_protocol.category = proto_json.get("category")
+        existing_protocol.twitter = proto_json.get("twitter")
+        existing_protocol.parent_protocol = proto_json.get("parentProtocol")
+        existing_protocol.chains = proto_json.get("chains")
+        existing_protocol.chain_tvls = proto_json.get("chainTvls")
+        existing_protocol.listed_at = proto_json.get("listedAt")
+        existing_protocol.slug = proto_json.get("slug") or proto_json.get("name").lower().replace(" ", "-")
+        
+        db.commit()
+        db.refresh(existing_protocol)
+        prots = existing_protocol
+    else:
+        # Insert new protocol
+        protocol = Protocol(
+            name=proto_json.get("name"),
+            protocol_id=proto_json.get("id"),
+            address=proto_json.get("address"),
+            symbol=proto_json.get("symbol"),
+            url=proto_json.get("url"),
+            description=proto_json.get("description"),
+            chain=proto_json.get("chain"),
+            logo=proto_json.get("logo"),
+            audits=proto_json.get("audits"),
+            category=proto_json.get("category"),
+            twitter=proto_json.get("twitter"),
+            parent_protocol=proto_json.get("parentProtocol"),
+            chains=proto_json.get("chains"),
+            chain_tvls=proto_json.get("chainTvls"),
+            listed_at=proto_json.get("listedAt"),
+            slug=proto_json.get("slug") or proto_json.get("name").lower().replace(" ", "-")
+        )
 
-    return protocols
+        db.add(protocol)
+        db.commit()
+        db.refresh(protocol)
+        prots = protocol
 
-@celery_app.task
+    return prots
+
 def pull_pool_data(limit: int = 10):
     db: Session = next(get_db())
     pools = fetch_pools(limit)
+    print(f"Fetched {len(pools)} pools from external API.")
     if not pools:
         return None
 
     explanation_engine = ExplanationEngine()
-    
+    created_pools = []  # List to keep track of created pools
 
     for pool_json in pools:
         score = score_defillama_pool(pool_json)
-        protocol = db.query(Protocol).filter(Protocol.name == pool_json.get("project")).first()
-
-        explanation = explanation_engine.generate_explanation(pool_json, score)
-        action = explanation_engine.generate_action(pool_json, score)
-
-
+        print(f"Project: {pool_json.get('project')}")
+        protocol = db.query(Protocol).filter(Protocol.name == pool_json.get("project").title()).first()
+        print(f"Processing pool: {pool_json.get('pool')} with protocol: {pool_json.get('project')}")
+        print(f"Found protocol: {protocol}")
         if not protocol:
-            pull_protocol_data.delay(pool_json.get("project"))
+            protocol = pull_protocol_data(pool_json.get("project"))
             continue
+
+
+        if db.query(Pool).filter(Pool.pool_id == pool_json.get("pool")).first():
+            print(f"Pool {pool_json.get('pool')} already exists. Skipping.")
+            continue  # Skip existing pools
+        explanation = explanation_engine.generate_explanation(pool_json, score)
+        time.sleep(60)  # To avoid hitting rate limits
+        action = explanation_engine.generate_action(pool_json, score)
 
         pool = Pool(
             pool_id=pool_json.get("pool"),
@@ -230,57 +273,64 @@ def pull_pool_data(limit: int = 10):
             sigma=pool_json.get("sigma"),
             count=pool_json.get("count"),
             outlier=pool_json.get("outlier"),
-
             tvl_score=score.get("tvl_score"),
             risk_score=score.get("risk_score"),
             final_score=score.get("final_score"),
             breakdown=score.get("breakdown"),
-
             summary=explanation,
             action=action,
         )
 
         db.add(pool)
+        created_pools.append(pool)
+        print(f"Added pool: {pool.pool_name}")
 
-
+    print(f"Pulled {len(created_pools)} new pools.")
     db.commit()
-    db.refresh(pool)
+
+    # Refresh all created pools
+    for pool in created_pools:
+        db.refresh(pool)
+
     return score
 
-
-@celery_app.task
 def ai_personalised_recommendations(pool_id: int, user_id: str):
     db: Session = next(get_db())
     pool = db.query(Pool).filter(Pool.id == pool_id).first()
     user = db.query(User).filter(User.id == user_id).first()
-    wallet = db.query(Wallet).first(Wallet.user_id == user_id)
-    wallet_analysis = db.query(WalletActivityScore).filter(WalletActivityScore.wallet == wallet)
+    wallet = db.query(Wallet).filter(Wallet.user_id == user_id).first()
+    wallet_analysis = None
+    if wallet:
+        wallet_analysis = db.query(WalletActivityScore).filter(WalletActivityScore.wallet_address == wallet.address).first()
+
     if not pool:
         return None
-    
+
+    # build profiles defensively
+    user_profile = {}
+    wallet_profile = {}
+    pool_data = {}
+
     if user:
         try:
             user_profile = {c.name: getattr(user, c.name) for c in user.__table__.columns}
-            user_profile["balance"] = get_balances(wallet.address)
+            if wallet:
+                user_profile["balance"] = get_balances(wallet.address)
         except Exception:
             user_profile = {k: v for k, v in vars(user).items() if not k.startswith('_')}
-    else:
-        print("⚠️ User not found for personalized recommendation")
+
     if wallet_analysis:
         try:
             wallet_profile = {c.name: getattr(wallet_analysis, c.name) for c in wallet_analysis.__table__.columns}
         except Exception:
             wallet_profile = {k: v for k, v in vars(wallet_analysis).items() if not k.startswith('_')}
-    else:
-        print("⚠️ Wallet analysis not found for personalized recommendation")
-    if pool:
-        try:
-            pool_data = {c.name: getattr(pool, c.name) for c in pool.__table__.columns}
-        except Exception:
-            pool_data = {k: v for k, v in vars(pool).items() if not k.startswith('_')}
-    else:
-        print("⚠️ Pool not found for personalized recommendation")
 
+    try:
+        pool_data = {c.name: getattr(pool, c.name) for c in pool.__table__.columns}
+    except Exception:
+        pool_data = {k: v for k, v in vars(pool).items() if not k.startswith('_')}
+
+    # call personalization engine (match signature)
     personalization = PersonalizationEngine()
     personal_exp = personalization.generate_explanation(user_profile=user_profile, score_result=wallet_profile, pool_data=pool_data)
     personal_action = personalization.generate_action(user_profile=user_profile, score_result=wallet_profile, pool_data=pool_data)
@@ -304,3 +354,19 @@ def ai_personalised_recommendations(pool_id: int, user_id: str):
     db.refresh(recommendation)
 
     return recommendation
+
+def start_test(user_id: str):
+    db: Session = next(get_db())
+    score = pull_pool_data(limit=1)
+    print("Pulled pool data with score:", score)
+    tx_list = pull_wallet_transactions("0x2908537D5e56F5BCEf80A1Fd7E8Ad3E05971C99E")
+    print(f"Pulled {len(tx_list['transaction_list'])} transactions.")
+    score_entry = analyze_wallet_data("0x2908537D5e56F5BCEf80A1Fd7E8Ad3E05971C99E")
+    if score_entry:
+        print("Wallet analysis score:", score_entry)
+    else:
+        print("No new wallet analysis created.")
+    for pool in db.query(Pool).limit(1).all():
+        rec = ai_personalised_recommendations(pool.id, user_id)
+    return {"status": "Test completed", "pool_score": score, "transactions_pulled": len(tx_list['transaction_list']), "wallet_analysis_score": score_entry.score if score_entry else None, "recommendation_id": rec.id if rec else None}
+
